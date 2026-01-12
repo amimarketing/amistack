@@ -1,0 +1,470 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/amistack/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  phone     String?
+  interest  String?
+  language  String   @default("pt")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  company   String?
+  phone     String?
+  message   String   @db.Text
+  language  String   @default("pt")
+  status    String   @default("new") // new, read, responded
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  stripeCustomerId     String   @unique
+  stripeSubscriptionId String?  @unique
+  stripePriceId        String
+  stripeCheckoutId     String?  @unique
+  status               String   // active, canceled, incomplete, etc.
+  planName             String   // Básico, Profissional, Enterprise
+  customerEmail        String
+  customerName         String?
+  startDate            DateTime?
+  endDate              DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([customerEmail])
+  @@index([status])
+}
+
+// Authentication Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("user")
+  companyName   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  companies     Company[]
+
+  @@index([email])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Business Models
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  website     String?
+  industry    String?
+  size        String?
+  status      String   @default("active")
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// CRM Models
+model CRMContact {
+  id              String            @id @default(cuid())
+  firstName       String
+  lastName        String?
+  fullName        String            // Computed field for searching
+  email           String?
+  phone           String?
+  mobile          String?
+  companyName     String?
+  jobTitle        String?
+  department      String?
+  website         String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  zipCode         String?
+  linkedIn        String?
+  notes           String?           @db.Text
+  photo           String?
+  source          String?           // website, referral, ad, manual, etc.
+  status          String            @default("active") // active, inactive, qualified, lost
+  leadScore       Int               @default(0)
+  userId          String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  interactions    CRMInteraction[]
+  tags            CRMContactTag[]
+
+  @@index([userId])
+  @@index([email])
+  @@index([status])
+  @@index([fullName])
+  @@index([createdAt])
+}
+
+model CRMInteraction {
+  id          String      @id @default(cuid())
+  type        String      // call, email, meeting, note, task, demo, proposal
+  title       String
+  description String?     @db.Text
+  outcome     String?     // successful, follow_up, not_interested, etc.
+  duration    Int?        // duration in minutes
+  scheduledAt DateTime?
+  completedAt DateTime?
+  contactId   String
+  contact     CRMContact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId      String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([contactId])
+  @@index([userId])
+  @@index([type])
+  @@index([scheduledAt])
+  @@index([createdAt])
+}
+
+model CRMTag {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  color     String          @default("#3B82F6") // Hex color code
+  userId    String
+  contacts  CRMContactTag[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([name])
+}
+
+model CRMContactTag {
+  id        String     @id @default(cuid())
+  contactId String
+  tagId     String
+  contact   CRMContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       CRMTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@unique([contactId, tagId])
+  @@index([contactId])
+  @@index([tagId])
+}
+
+// Smart Forms Models
+model Form {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?          @db.Text
+  status          String           @default("active") // active, inactive, draft
+  submitButtonText String          @default("Enviar")
+  successMessage  String           @default("Obrigado! Recebemos seu formulário.")
+  redirectUrl     String?
+  notifyEmail     String?          // Email to notify on submission
+  integrateCRM    Boolean          @default(false) // Auto-create CRM contact
+  fields          FormField[]
+  submissions     FormSubmission[]
+  landingPages    LandingPage[]
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FormField {
+  id          String   @id @default(cuid())
+  label       String
+  fieldType   String   // text, email, phone, textarea, select, checkbox, radio
+  placeholder String?
+  required    Boolean  @default(false)
+  options     String?  @db.Text // JSON array for select/radio options
+  order       Int      @default(0)
+  formId      String
+  form        Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([formId])
+  @@index([order])
+}
+
+model FormSubmission {
+  id          String                  @id @default(cuid())
+  formId      String
+  form        Form                    @relation(fields: [formId], references: [id], onDelete: Cascade)
+  values      FormSubmissionValue[]
+  ipAddress   String?
+  userAgent   String?                 @db.Text
+  status      String                  @default("new") // new, read, contacted
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([formId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FormSubmissionValue {
+  id           String         @id @default(cuid())
+  submissionId String
+  submission   FormSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fieldLabel   String
+  fieldValue   String         @db.Text
+  createdAt    DateTime       @default(now())
+
+  @@index([submissionId])
+}
+
+// Marketing Automation & Workflows
+model Workflow {
+  id          String              @id @default(cuid())
+  name        String
+  description String?             @db.Text
+  status      String              @default("draft") // draft, active, paused, archived
+  trigger     String              // new_lead, new_contact, form_submit, tag_added, lead_score_changed, date_based
+  triggerConfig String?           @db.Text // JSON config for trigger (e.g., formId, tagId, score threshold)
+  userId      String
+  actions     WorkflowAction[]
+  executions  WorkflowExecution[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([trigger])
+  @@index([createdAt])
+}
+
+model WorkflowAction {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  order       Int      @default(0)
+  type        String   // send_email, create_task, add_tag, update_contact, wait, condition, webhook
+  config      String   @db.Text // JSON config for action (e.g., email template, tag name, wait duration)
+  delayMinutes Int     @default(0) // Delay before executing this action
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([order])
+  @@index([type])
+}
+
+model WorkflowExecution {
+  id          String        @id @default(cuid())
+  workflowId  String
+  workflow    Workflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  status      String        @default("running") // running, completed, failed, cancelled
+  contactId   String?       // Reference to CRMContact if applicable
+  formSubmissionId String?  // Reference to FormSubmission if applicable
+  leadId      String?       // Reference to Lead if applicable
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+  errorMessage String?      @db.Text
+  logs        WorkflowLog[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([contactId])
+  @@index([startedAt])
+  @@index([createdAt])
+}
+
+model WorkflowLog {
+  id          String            @id @default(cuid())
+  executionId String
+  execution   WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  actionType  String
+  status      String            // success, failed, skipped
+  message     String            @db.Text
+  data        String?           @db.Text // JSON data related to the action
+  createdAt   DateTime          @default(now())
+
+  @@index([executionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Landing Page Builder Models
+model LandingPage {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique // URL-friendly identifier
+  template        String   // saas, produtos, servicos
+  status          String   @default("draft") // draft, published
+  
+  // Customizable content
+  title           String
+  subtitle        String?  @db.Text
+  heroImage       String?
+  ctaText         String   @default("Começar Agora")
+  ctaUrl          String?
+  
+  // SEO fields
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  
+  // Custom colors (optional override)
+  primaryColor    String?
+  secondaryColor  String?
+  
+  // Features section (JSON array)
+  features        String?  @db.Text // JSON: [{title, description, icon}]
+  
+  // Testimonials (JSON array)
+  testimonials    String?  @db.Text // JSON: [{name, role, text, photo}]
+  
+  // Analytics
+  views           Int      @default(0)
+  conversions     Int      @default(0)
+  
+  // Form integration
+  formId          String?
+  form            Form?    @relation(fields: [formId], references: [id], onDelete: SetNull)
+  
+  userId          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  publishedAt     DateTime?
+
+  @@index([userId])
+  @@index([slug])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// AI Chatbots Models
+model Chatbot {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?          @db.Text
+  status          String           @default("active") // active, inactive
+  
+  // Bot configuration
+  greeting        String           @default("Olá! Como posso ajudar você hoje?")
+  fallbackMessage String           @default("Desculpe, não entendi. Pode reformular?")
+  theme           String           @default("orange") // orange, blue, green, purple
+  position        String           @default("bottom-right") // bottom-right, bottom-left
+  
+  // Knowledge base (simple keyword-response pairs)
+  knowledgeBase   String?          @db.Text // JSON: [{keywords: [], response: ""}]
+  
+  // Analytics
+  totalMessages   Int              @default(0)
+  totalSessions   Int              @default(0)
+  
+  // Conversations
+  conversations   ChatConversation[]
+  
+  userId          String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ChatConversation {
+  id          String        @id @default(cuid())
+  chatbotId   String
+  chatbot     Chatbot       @relation(fields: [chatbotId], references: [id], onDelete: Cascade)
+  visitorName String?
+  visitorEmail String?
+  messages    ChatMessage[]
+  status      String        @default("active") // active, closed
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([chatbotId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ChatMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         String           // bot, user
+  message        String           @db.Text
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
