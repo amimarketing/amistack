@@ -17,3 +17,4 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+// Force deploy Fri Jan 16 04:23:55 UTC 2026
