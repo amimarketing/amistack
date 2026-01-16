@@ -1,21 +1,5 @@
 {
-  "buildCommand": "yarn build",
-  "devCommand": "yarn dev",
-  "installCommand": "yarn install",
-  "framework": "nextjs",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    }
-  ],
-  "env": {
-    "NEXTAUTH_URL": "https://amistack.vercel.app",
-    "NODE_ENV": "production"
-  },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_APP_URL": "https://amistack.vercel.app"
-    }
-  }
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "framework": "nextjs"
 }
